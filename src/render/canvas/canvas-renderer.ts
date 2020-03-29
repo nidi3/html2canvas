@@ -498,7 +498,7 @@ export class CanvasRenderer {
         this.ctx.closePath();
     }
 
-    formatBorderPath(t: Trapezoid) {
+    formatBorderPath(t: Trapezoid, offset: number) {
         const c = new Path2D();
         c.moveTo(t.ps[0].x, t.ps[0].y);
         c.lineTo(t.ps[1].x, t.ps[1].y);
@@ -506,9 +506,9 @@ export class CanvasRenderer {
         c.lineTo(t.ps[3].x, t.ps[3].y);
         this.ctx.clip(c);
         this.ctx.lineWidth = t.height();
-        const rp = t.rectanglePoints();
-        this.ctx.moveTo(rp[0].x, rp[0].y);
-        this.ctx.lineTo(rp[1].x, rp[1].y);
+        const line = t.middleLine(offset);
+        this.ctx.moveTo(line[0].x, line[0].y);
+        this.ctx.lineTo(line[1].x, line[1].y);
     }
 
     formatPath(paths: Path[]) {
@@ -646,6 +646,7 @@ export class CanvasRenderer {
         const t = Trapezoid.of(paths);
         if (t) {
             const effColor = this.borderColor(color, side, style);
+            let offset = 0;
             switch (style) {
                 case BORDER_STYLE.DASHED:
                     const dashLen = t.width() / (Math.round((t.width() / t.height() - 2) / 3) * 3 + 2);
@@ -653,7 +654,9 @@ export class CanvasRenderer {
                     break;
                 case BORDER_STYLE.DOTTED:
                     const spaces = Math.round((t.width() / t.height() - 1) / 2);
-                    this.ctx.setLineDash([t.height(), (t.width() - (spaces + 1) * t.height()) / spaces]);
+                    this.ctx.setLineDash([0, t.height() + (t.width() - (spaces + 1) * t.height()) / spaces]);
+                    offset = t.height() / 2;
+                    this.ctx.lineCap = 'round';
                     break;
                 case BORDER_STYLE.RIDGE:
                     if (t.height() >= 2) {
@@ -680,8 +683,9 @@ export class CanvasRenderer {
                     }
                     break;
             }
-            this.renderTrapezoid(t, effColor);
+            this.renderTrapezoid(t, effColor, offset);
             this.ctx.setLineDash([]);
+            this.ctx.lineCap = 'butt';
         } else {
             this.ctx.beginPath();
             this.formatPath(paths);
@@ -690,10 +694,10 @@ export class CanvasRenderer {
         }
     }
 
-    renderTrapezoid(t: Trapezoid, color: Color) {
+    renderTrapezoid(t: Trapezoid, color: Color, offset: number = 0) {
         this.ctx.save();
         this.ctx.beginPath();
-        this.formatBorderPath(t);
+        this.formatBorderPath(t, offset);
         this.ctx.strokeStyle = asString(color);
         this.ctx.stroke();
         this.ctx.restore();

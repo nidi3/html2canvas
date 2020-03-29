@@ -40,13 +40,13 @@ export class Trapezoid {
         return maxX - minX;
     }
 
-    rectanglePoints(): Vector[] {
+    middleLine(offset: number): Vector[] {
         if (this.vertical) {
             const up = this.ps[0].y < this.ps[1].y;
             const i = this.ps[0].y > this.ps[3].y === up ? 3 : 0;
             const j = this.ps[1].y > this.ps[2].y === up ? 1 : 2;
             return [
-                new Vector((this.ps[0].x + this.ps[3].x) / 2, this.ps[i].y),
+                new Vector((this.ps[0].x + this.ps[3].x) / 2, this.ps[i].y + (up ? 1 : -1) * offset),
                 new Vector((this.ps[1].x + this.ps[2].x) / 2, this.ps[j].y)
             ];
         } else {
@@ -54,7 +54,7 @@ export class Trapezoid {
             const i = this.ps[0].x > this.ps[3].x === right ? 3 : 0;
             const j = this.ps[1].x > this.ps[2].x === right ? 1 : 2;
             return [
-                new Vector(this.ps[i].x, (this.ps[0].y + this.ps[3].y) / 2),
+                new Vector(this.ps[i].x + (right ? 1 : -1) * offset, (this.ps[0].y + this.ps[3].y) / 2),
                 new Vector(this.ps[j].x, (this.ps[1].y + this.ps[2].y) / 2)
             ];
         }
