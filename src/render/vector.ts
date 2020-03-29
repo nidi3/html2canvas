@@ -14,6 +14,10 @@ export class Vector implements IPath {
     add(deltaX: number, deltaY: number): Vector {
         return new Vector(this.x + deltaX, this.y + deltaY);
     }
+
+    interpolate(v2: Vector, f: number): Vector {
+        return new Vector(this.x * (1 - f) + v2.x * f, this.y * (1 - f) + v2.y * f);
+    }
 }
 
 export const isVector = (path: Path): path is Vector => path.type === PathType.VECTOR;

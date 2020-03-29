@@ -3,6 +3,7 @@ import {TokenType} from '../syntax/tokenizer';
 import {ITypeDescriptor} from '../ITypeDescriptor';
 import {angle, deg} from './angle';
 import {getAbsoluteValue, isLengthPercentage} from './length-percentage';
+
 export type Color = number;
 
 export const color: ITypeDescriptor<Color> = {
@@ -67,6 +68,14 @@ export const asString = (color: Color) => {
     const green = 0xff & (color >> 16);
     const red = 0xff & (color >> 24);
     return alpha < 255 ? `rgba(${red},${green},${blue},${alpha / 255})` : `rgb(${red},${green},${blue})`;
+};
+
+export const darker = (color: Color, factor: number): Color => {
+    const alpha = 0xff & color;
+    const blue = 0xff & (color >> 8);
+    const green = 0xff & (color >> 16);
+    const red = 0xff & (color >> 24);
+    return pack(red * (1 - factor), green * (1 - factor), blue * (1 - factor), alpha/255);
 };
 
 export const pack = (r: number, g: number, b: number, a: number): Color =>

@@ -1,5 +1,5 @@
 import {ElementPaint, parseStackingContexts, StackingContext} from '../stacking-context';
-import {asString, Color, isTransparent} from '../../css/types/color';
+import {asString, Color, darker, isTransparent} from '../../css/types/color';
 import {Logger} from '../../core/logger';
 import {ElementContainer} from '../../dom/element-container';
 import {BORDER_STYLE} from '../../css/property-descriptors/border-style';
@@ -38,6 +38,7 @@ import {TextareaElementContainer} from '../../dom/elements/textarea-element-cont
 import {SelectElementContainer} from '../../dom/elements/select-element-container';
 import {IFrameElementContainer} from '../../dom/replaced-elements/iframe-element-container';
 import {TextShadow} from '../../css/property-descriptors/text-shadow';
+import {Trapezoid} from '../trapezoid';
 
 export type RenderConfigurations = RenderOptions & {
     backgroundColor: Color | null;
@@ -497,6 +498,19 @@ export class CanvasRenderer {
         this.ctx.closePath();
     }
 
+    formatBorderPath(t: Trapezoid) {
+        const c = new Path2D();
+        c.moveTo(t.ps[0].x, t.ps[0].y);
+        c.lineTo(t.ps[1].x, t.ps[1].y);
+        c.lineTo(t.ps[2].x, t.ps[2].y);
+        c.lineTo(t.ps[3].x, t.ps[3].y);
+        this.ctx.clip(c);
+        this.ctx.lineWidth = t.height();
+        const rp = t.rectanglePoints();
+        this.ctx.moveTo(rp[0].x, rp[0].y);
+        this.ctx.lineTo(rp[1].x, rp[1].y);
+    }
+
     formatPath(paths: Path[]) {
         paths.forEach((point, index) => {
             const start: Vector = isBezierCurve(point) ? point.start : point;
@@ -627,10 +641,72 @@ export class CanvasRenderer {
         }
     }
 
-    async renderBorder(color: Color, side: number, curvePoints: BoundCurves) {
-        this.path(parsePathForBorder(curvePoints, side));
-        this.ctx.fillStyle = asString(color);
-        this.ctx.fill();
+    async renderBorder(color: Color, side: number, curvePoints: BoundCurves, style: BORDER_STYLE) {
+        const paths = parsePathForBorder(curvePoints, side);
+        const t = Trapezoid.of(paths);
+        if (t) {
+            const effColor = this.borderColor(color, side, style);
+            switch (style) {
+                case BORDER_STYLE.DASHED:
+                    const dashLen = t.width() / (Math.round((t.width() / t.height() - 2) / 3) * 3 + 2);
+                    this.ctx.setLineDash([2 * dashLen, dashLen]);
+                    break;
+                case BORDER_STYLE.DOTTED:
+                    const spaces = Math.round((t.width() / t.height() - 1) / 2);
+                    this.ctx.setLineDash([t.height(), (t.width() - (spaces + 1) * t.height()) / spaces]);
+                    break;
+                case BORDER_STYLE.RIDGE:
+                    if (t.height() >= 2) {
+                        const ts = t.split(2);
+                        this.renderTrapezoid(ts[0], this.borderColor(color, side, BORDER_STYLE.OUTSET));
+                        this.renderTrapezoid(ts[1], this.borderColor(color, side, BORDER_STYLE.INSET));
+                        return;
+                    }
+                    break;
+                case BORDER_STYLE.GROOVE:
+                    if (t.height() >= 2) {
+                        const ts = t.split(2);
+                        this.renderTrapezoid(ts[0], this.borderColor(color, side, BORDER_STYLE.INSET));
+                        this.renderTrapezoid(ts[1], this.borderColor(color, side, BORDER_STYLE.OUTSET));
+                        return;
+                    }
+                    break;
+                case BORDER_STYLE.DOUBLE:
+                    if (t.height() >= 3) {
+                        const ts = t.split(3);
+                        this.renderTrapezoid(ts[0], effColor);
+                        this.renderTrapezoid(ts[2], effColor);
+                        return;
+                    }
+                    break;
+            }
+            this.renderTrapezoid(t, effColor);
+            this.ctx.setLineDash([]);
+        } else {
+            this.ctx.beginPath();
+            this.formatPath(paths);
+            this.ctx.fillStyle = asString(color);
+            this.ctx.fill();
+        }
+    }
+
+    renderTrapezoid(t: Trapezoid, color: Color) {
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.formatBorderPath(t);
+        this.ctx.strokeStyle = asString(color);
+        this.ctx.stroke();
+        this.ctx.restore();
+    }
+
+    borderColor(color: Color, side: number, style: BORDER_STYLE) {
+        if (style === BORDER_STYLE.INSET && (side === 0 || side === 3)) {
+            return darker(color, .6);
+        }
+        if (style === BORDER_STYLE.OUTSET && (side === 1 || side === 2)) {
+            return darker(color, .6);
+        }
+        return color;
     }
 
     async renderNodeBackgroundAndBorders(paint: ElementPaint) {
@@ -703,7 +779,7 @@ export class CanvasRenderer {
         let side = 0;
         for (const border of borders) {
             if (border.style !== BORDER_STYLE.NONE && !isTransparent(border.color)) {
-                await this.renderBorder(border.color, side, paint.curves);
+                await this.renderBorder(border.color, side, paint.curves, border.style);
             }
             side++;
         }
