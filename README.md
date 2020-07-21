@@ -10,6 +10,7 @@ html2canvas
 
 This is a branch of the original and fixes:
 - Rendering of textarea (see [#2008](https://github.com/niklasvh/html2canvas/issues/2008))
+- Font-family inside SVG (see [#1724](https://github.com/niklasvh/html2canvas/pull/1724))
 
 #### JavaScript HTML renderer ####
 
